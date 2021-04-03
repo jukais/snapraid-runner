@@ -39,7 +39,7 @@ def tee_log(infile, out_lines, log_level):
     return t
 
 
-def snapraid_command(command, args={}, *, allow_statuscodes=[]):
+def snapraid_command(command, args={}, *, allow_statuscodes=[], log_level = 15):
     """
     Run snapraid command
     Raises subprocess.CalledProcessError if errorlevel != 0
@@ -59,7 +59,7 @@ def snapraid_command(command, args={}, *, allow_statuscodes=[]):
     )
     out = []
     threads = [
-        tee_log(p.stdout, out, logging.OUTPUT),
+        tee_log(p.stdout, out, log_level),
         tee_log(p.stderr, [], logging.OUTERR)]
     for t in threads:
         t.join()
@@ -161,6 +161,7 @@ def load_config(args):
     config["scrub"]["enabled"] = (config["scrub"]["enabled"].lower() == "true")
     config["email"]["short"] = (config["email"]["short"].lower() == "true")
     config["snapraid"]["touch"] = (config["snapraid"]["touch"].lower() == "true")
+    config["snapraid"]["smart"] = (config["snapraid"]["smart"].lower() == "true")
 
     if args.scrub is not None:
         config["scrub"]["enabled"] = args.scrub
@@ -184,6 +185,7 @@ def setup_logger():
         file_logger = logging.handlers.RotatingFileHandler(
             config["logging"]["file"],
             maxBytes=max_log_size,
+            encoding="utf-8",
             backupCount=9)
         file_logger.setFormatter(log_format)
         root_logger.addHandler(file_logger)
@@ -254,6 +256,15 @@ def run():
     if config["snapraid"]["touch"]:
         logging.info("Running touch...")
         snapraid_command("touch")
+        logging.info("*" * 60)
+    
+    if config["snapraid"]["smart"]:
+        logging.info("Running S.M.A.R.T...")
+        try:
+            snapraid_command("smart", log_level = logging.INFO)
+        except subprocess.CalledProcessError as e:
+            logging.error(e)
+            finish(False)
         logging.info("*" * 60)
 
     logging.info("Running diff...")
